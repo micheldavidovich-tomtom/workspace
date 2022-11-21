@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  jupyter:
+    build:
+      context: environment/jupyter/
+      dockerfile: Dockerfile
+      network: "host"
+    tty: true
+    user: vscode
+    network_mode: "host"

@@ -1,0 +1,9 @@
+plotnine
+streamlit
+pycountry
+country_list
+country_converter
+altair
+keplergl
+geopandas
+rtree

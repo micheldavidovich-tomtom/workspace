@@ -1,0 +1,7 @@
+python
+pycountry
+country_list
+country_converter
+regex
+geopandas
+rtree
