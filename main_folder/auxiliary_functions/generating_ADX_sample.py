@@ -528,7 +528,7 @@ def get_country_logs(
                                                                 secret_id=secret_id,
                                                                 tenant_id=tenant_id) 
     except azure.kusto.data.exceptions.KustoMultiApiError:
-        dates = np.linspace(15, 720, 15)
+        dates = np.linspace(15, ago, 15)
         num_entries, i = 0, 0
         addresses_df = pd.DataFrame()
 
