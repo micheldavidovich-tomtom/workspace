@@ -484,6 +484,9 @@ class TomtomApi(ApiCall):
         """
         address = param_dict.get("address")
         limit = param_dict.get("limit", 50)
+        sleep = param_dict.get("sleep")
+        if sleep is not None:
+            time.sleep(sleep/2.5)
         country = param_dict.get("country", None)
         address_quoted = quote(address, safe='')  # url encode also with slashes /=%2F
         if country and country == "kr":

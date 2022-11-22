@@ -297,6 +297,17 @@ def get_s2sG_results(sdf) -> pd.DataFrame:
         lambda x: '' if regex.search(country_condition, x) is None 
         else regex.search(country_condition, x).group(1)
     )
+
+    ## Creating the searched queries:
+    total_columns = [
+        'lp_building_name', 'lp_near', 'lp_house_number', 'lp_road', 'lp_unit', 'lp_floor', 'lp_staircase', 
+        'lp_entrance', 'lp_postal_code', 'lp_po_box', 'lp_suburb', 'lp_city_district', 'lp_city', 'lp_island',
+        'lp_state_district', 'lp_state', 'lp_country_region', 'lp_country'
+    ]
+
+    df.loc[s2sg_filter, 'searched_query'] = df.loc[s2sg_filter, total_columns].apply(
+        lambda x: re.sub('\s+',' ', ' '.join(x[total_columns].values).rstrip().lstrip().replace('%20', ' ')), axis=1
+    )
     
     return df
 

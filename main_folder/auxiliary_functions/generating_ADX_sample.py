@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import regex
 from datetime import date
 from pyspark.sql.functions import DataFrame
+import azure.kusto.data.exceptions
 
 # COMMAND ----------
 
@@ -82,7 +83,7 @@ def query_addresses_new(
     ago: int or None = 365,
     check_query: bool = False,
     deduplicate: bool = True,
-    filter_results: int = 10000000
+    #filter_results: int = 10000000
 ) -> str:
 
     """Function that generates the string query in KQL (kusto query language) to perform in ADX.
@@ -184,7 +185,7 @@ def query_addresses_new(
         developer_line = f'''| where developer_email !in~ ('{developer_emails_list}')'''
     else:
         developer_line = f'| where developer_email !in~ {str(developer_emails_list)}'
-        
+
     if exclude_endpoint_list is None:
         developer_line = ''
     elif type(exclude_endpoint_list) == str:
@@ -216,10 +217,10 @@ def query_addresses_new(
     else:
         deduplicate_string = ''
         
-    if filter_results is not None:
-        reduce_sample = f'| limit {filter_results}'
-    else:
-        reduce_sample = ''
+    # if filter_results is not None:
+    #     reduce_sample = f'| limit {filter_results}'
+    # else:
+    #     reduce_sample = ''
         
         
     ###############################################################
@@ -232,7 +233,6 @@ def query_addresses_new(
                             {exclude_developer_line}
                             {populated_fields_string}
                             {developer_line}
-                            {reduce_sample}
                             {deduplicate_string}
                             {order_string}
                             {sample_string}
@@ -244,6 +244,178 @@ def query_addresses_new(
         print('\n')
     
     return building_string
+
+def query_addresses_date_range(
+    country_names: typing.List[str] or typing.Tuple[str] or None,
+    populated_fields: typing.List[str] or typing.Tuple[str] or None,
+    country: str,
+    table: str = 'search_logs_insights',
+    endpoint_list: typing.List[str] or typing.Tuple[str] or None = None,
+    exclude_endpoint_list: typing.List[str] or typing.Tuple[str] or None = ('search 2 poiSearch'),
+    developer_emails_list: typing.List[str] or typing.Tuple[str] or None = ('maps.analytics.metrics@groups.tomtom.com', ''),
+    only_full_addresses: bool = True,
+    sample: int or None = 100000,
+    daterange_recent: int or None = 15,
+    daterange_furthest: int or None = 30,
+    check_query: bool = False,
+    deduplicate: bool = True,
+) -> str:
+    """_summary_
+
+    :param country_names: _description_
+    :type country_names: typing.List[str]ortyping.Tuple[str]orNone
+    :param populated_fields: _description_
+    :type populated_fields: typing.List[str]ortyping.Tuple[str]orNone
+    :param country: _description_
+    :type country: str
+    :param table: _description_, defaults to 'search_logs_insights'
+    :type table: str, optional
+    :param endpoint_list: _description_, defaults to None
+    :type endpoint_list: typing.List[str]ortyping.Tuple[str]orNone, optional
+    :param exclude_endpoint_list: _description_, defaults to ('search 2 poiSearch')
+    :type exclude_endpoint_list: typing.List[str]ortyping.Tuple[str]orNone, optional
+    :param developer_emails_list: _description_, defaults to ('maps.analytics.metrics@groups.tomtom.com', '')
+    :type developer_emails_list: typing.List[str]ortyping.Tuple[str]orNone, optional
+    :param only_full_addresses: _description_, defaults to True
+    :type only_full_addresses: bool, optional
+    :param sample: _description_, defaults to 100000
+    :type sample: intorNone, optional
+    :param daterange_recent: _description_, defaults to 15
+    :type daterange_recent: intorNone, optional
+    :param daterange_furthest: _description_, defaults to 30
+    :type daterange_furthest: intorNone, optional
+    :param check_query: _description_, defaults to False
+    :type check_query: bool, optional
+    :param deduplicate: _description_, defaults to True
+    :type deduplicate: bool, optional
+    :return: _description_
+    :rtype: str
+    """
+    ###### ERROR Handling ######
+
+    if not ((isinstance(country_names, list)) or (isinstance(country_names, tuple)) or (country_names is not None)):
+        input = "country_names"
+        raise TypeError('The input "country_names" must be a list, tuple or None')
+    else:
+        if isinstance(country_names, list):
+            country_names = tuple(country_names)
+
+    if not ((isinstance(populated_fields, list)) or (isinstance(populated_fields, tuple)) or (populated_fields is None)):
+        input = 'populated_fields'
+        raise TypeError(f'The input "{input}" must be a list, tuple or None')
+    else:
+        if isinstance(populated_fields, list):
+            populated_fields = tuple(populated_fields)
+
+    if not ((isinstance(endpoint_list, list)) or (isinstance(endpoint_list, tuple)) or (endpoint_list is None)):
+        input = 'endpoint_list'
+        raise TypeError(f'The input "{input}" must be a list, tuple or None')
+    else:
+        if isinstance(endpoint_list, list):
+            endpoint_list = tuple(endpoint_list)
+    
+    if not (
+        (isinstance(developer_emails_list, list)) or (isinstance(developer_emails_list, tuple)) or (developer_emails_list is None)
+        or (isinstance(developer_emails_list, str))
+    ):
+        input = 'developer_emails_list'
+        raise TypeError(f'The input "{input}" must be a list, tuple, string or None')
+    else:
+        if isinstance(developer_emails_list, list):
+            developer_emails_list = tuple(developer_emails_list)
+            
+    if not (
+        (isinstance(exclude_endpoint_list, list)) or (isinstance(exclude_endpoint_list, tuple)) or (exclude_endpoint_list is None)
+        or (isinstance(exclude_endpoint_list, str))
+    ):
+        input = 'exclude_endpoint_list'
+        raise TypeError(f'The input "{input}" must be a list, tuple, string or None')
+    else:
+        if isinstance(developer_emails_list, list):
+            developer_emails_list = tuple(developer_emails_list)
+            
+    if not ((isinstance(sample, int)) or (sample is None)):
+        input = 'sample'
+        raise TypeError(f'The input "{input}" must be an int or None')
+
+    ############################
+    
+    # Turn country_names and populated fields into strings
+    country_names = str(tuple(country_names))
+        
+    if only_full_addresses:
+        who_searched = "| where who_searched == 'Full Address Search'"
+    else:
+        who_searched = ''
+        
+    if developer_emails_list is None:
+        developer_line = ''
+    elif type(developer_emails_list) == str:
+        developer_line = f'''| where developer_email !in~ ('{developer_emails_list}')'''
+    else:
+        developer_line = f'| where developer_email !in~ {str(developer_emails_list)}'
+
+    if exclude_endpoint_list is None:
+        developer_line = ''
+    elif type(exclude_endpoint_list) == str:
+        exclude_developer_line = f'''| where method_name !in~ ('{exclude_endpoint_list}')'''
+    else:
+        exclude_developer_line = f'| where method_name !in~ {str(exclude_endpoint_list)}'
+
+    if populated_fields is not None:
+        populated_fields_string = f"| where populated_fields in {populated_fields}"
+    else:
+        populated_fields_string = ''
+
+    if endpoint_list is not None:
+        endpoint_string = f'| where method_name in~ {endpoint_list}'
+    else:
+        endpoint_string = ''
+        
+    if sample is not None:
+        sample_string = f'| sample {sample}'
+    else:
+        sample_string = ''
+        
+    order_string = ''
+        
+    if deduplicate:
+        deduplicate_string = '| summarize search_query_counts = count() by request_uri, searched_query, populated_fields, ordered_populated_fields, countryName, who_searched, request_country, method_name, lib_postal_result, parsed_request_quertystring, developer_email, house, near, house_number, road, unit, level, entrance, staircase, po_box, postcode, suburb, city_district, city, island, state_district, state, country_region, world_region'
+        sample_string = f'| limit {sample}'
+        order_string = '| order by search_query_counts'
+    else:
+        deduplicate_string = ''
+
+    look_back = f'| where (ago({daterange_furthest}d) > client_received_start_timestamp) and (client_received_start_timestamp < ago({daterange_recent}d))'
+        
+    # if filter_results is not None:
+    #     reduce_sample = f'| limit {filter_results}'
+    # else:
+    #     reduce_sample = ''
+        
+        
+    ###############################################################
+
+    building_string = f'''{table}
+                            {look_back}
+                            {who_searched}
+                            | where countryName in~ {country_names}
+                            {endpoint_string}
+                            {exclude_developer_line}
+                            {populated_fields_string}
+                            {developer_line}
+                            {deduplicate_string}
+                            {order_string}
+                            {sample_string}
+                            | extend country = '{country}'
+                        '''
+    if check_query:
+        print('THIS IS THE QUERY YOU EXECUTED ON ADX:')
+        print(building_string)
+        print('\n')
+    
+    return building_string
+
 
 def parse_populated_fields(df: pd.DataFrame) -> pd.DataFrame:
     """Translate the keys from populated fields into readable content
@@ -294,7 +466,7 @@ def get_country_logs(
     country: str, endpoint_list: list or tuple or None = None, table: str = 'search_logs_insights', sample: int=10000, 
     populated_fields: list or tuple or None = None, developer_emails_list: list or tuple or None = None, ago: int = 365, 
     exclude_endpoint_list: list or tuple or str or None = ('search 2 poiSearch'), only_full_addresses: bool = True, 
-    check_query: bool = False, deduplicate: bool = True, filter_results: int = 10000000
+    check_query: bool = False, deduplicate: bool = True #, filter_results: int = 10000000
 ) -> pd.DataFrame:
     """Gets search logs for a given country
     :param country: string of ISO-2 code of a country ('ES', not 'ESP').
@@ -340,19 +512,58 @@ def get_country_logs(
         ago=ago,
         check_query=check_query,
         deduplicate=deduplicate,
-        filter_results=filter_results
+        exclude_endpoint_list=exclude_endpoint_list,
+        #filter_results=filter_results
     )
 
     tenant_id, client_id, secret_value, secret_id = connections_utils.get_adx_secrets()
     adx_instance = adx.AzureDataExplorer()
 
 
-    addresses_df, _ = adx_instance.execute_adx_query(query=query_country,
-                                                    cluster="https://ttapianalyticsadxpweu.westeurope.kusto.windows.net",
-                                                               database="ttapianalytics-onlineSearch",
-                                                               client_id=client_id,
-                                                               secret_id=secret_id,
-                                                               tenant_id=tenant_id) 
+    try:
+        addresses_df, _ = adx_instance.execute_adx_query(query=query_country,
+                                                        cluster="https://ttapianalyticsadxpweu.westeurope.kusto.windows.net",
+                                                                database="ttapianalytics-onlineSearch",
+                                                                client_id=client_id,
+                                                                secret_id=secret_id,
+                                                                tenant_id=tenant_id) 
+    except azure.kusto.data.exceptions.KustoMultiApiError:
+        dates = np.linspace(15, 720, 15)
+        num_entries, i = 0, 0
+        addresses_df = pd.DataFrame()
+
+        while num_entries < sample:
+            query_country = query_addresses_date_range(
+                country_names=country_names.spellings[0],
+                populated_fields=populated_fields,
+                country=country,
+                table=table, 
+                endpoint_list=endpoint_list,
+                developer_emails_list=developer_emails_list,
+                only_full_addresses=only_full_addresses,
+                sample=sample,
+                daterange_furthest=dates[i + 1],
+                daterange_recent=dates[i],
+                check_query=check_query,
+                deduplicate=deduplicate,
+                exclude_endpoint_list=exclude_endpoint_list,
+            )
+
+            adx_df, _ = adx_instance.execute_adx_query(
+                query=query_country,
+                cluster="https://ttapianalyticsadxpweu.westeurope.kusto.windows.net",
+                database="ttapianalytics-onlineSearch",
+                client_id=client_id,
+                secret_id=secret_id,
+                tenant_id=tenant_id
+            ) 
+
+            addresses_df = pd.concat([addresses_df, adx_df])
+            num_entries = addresses_df.shape[0]
+            
+            i += 1
+
+
     addresses_df = parse_populated_fields(addresses_df)
     addresses_df.countryName = addresses_df.countryName.str.upper()
     
@@ -418,7 +629,8 @@ def address_components_sample_generator(
         sample_df = get_country_logs(
             country=country, endpoint_list=endpoint_list, table=table, sample=sample, populated_fields=populated_fields, 
             developer_emails_list=developer_emails_list, ago=ago, only_full_addresses=only_full_addresses, 
-            exclude_endpoint_list=exclude_endpoint_list, check_query=check_query, deduplicate=deduplicate, filter_results=filter_results
+            exclude_endpoint_list=exclude_endpoint_list, check_query=check_query, deduplicate=deduplicate, 
+            #filter_results=filter_results
         )
         
         country_dict[country] = sample_df
@@ -452,6 +664,15 @@ def get_countries_correctly(countries: list or str):
 # MAGIC ### Building the function to extract and calculate the parsed components from the tables
 
 # COMMAND ----------
+
+def get_libpostal_condition(component, possible_results):
+    '''
+    :param possible_results: These are the possible outcomes that this value may have. For example a house number can contain spaces, letters and numbers (think of calle de Goya 23 b --> house number is: "23 b")
+    :type possible_results: str
+    '''
+    libpostal_condition = f'"{component}":"{possible_results}"' + '[,\}]'
+    
+    return libpostal_condition
 
 def get_libpostal_condition(component, possible_results):
     '''
@@ -725,6 +946,17 @@ def get_s2sG_results(sdf) -> pd.DataFrame:
         lambda x: '' if regex.search(country_condition, x) is None 
         else regex.search(country_condition, x).group(1)
     )
+
+    ## Creating the searched queries:
+    total_columns = [
+        'lp_building_name', 'lp_near', 'lp_house_number', 'lp_road', 'lp_unit', 'lp_floor', 'lp_staircase', 
+        'lp_entrance', 'lp_postal_code', 'lp_po_box', 'lp_suburb', 'lp_city_district', 'lp_city', 'lp_island',
+        'lp_state_district', 'lp_state', 'lp_country_region', 'lp_country'
+    ]
+
+    df.loc[s2sg_filter, 'searched_query'] = df.loc[s2sg_filter, total_columns].apply(
+        lambda x: re.sub('\s+',' ', ' '.join(x[total_columns].values).rstrip().lstrip().replace('%20', ' ')), axis=1
+    )
     
     return df
 
@@ -778,3 +1010,35 @@ def parse_address_components(country_df: pd.DataFrame) -> pd.DataFrame:
     response['has_world_region'] = response['lp_world_region'].map(lambda x: True if x not in empty_condition else False)
     
     return response
+
+#### SAVING THE SAMPLE ####
+def general_dbfs_save_function_dict_of_countries(
+    dictionary: dict, path: str, file_type: str, name_append: str, sep: str or None = ';',
+    selected_columns: list = ['request_uri', 'searched_query', 'populated_fields', 'countryName', 'who_searched', 'request_country', 'method_name', 'lib_postal_result', 'parsed_request_quertystring', 'developer_email', 'search_query_counts', 'country', 'components', 'number_components'], 
+    ) -> None:
+    """Function that saves the results of the dataframe you pass into different files following the structure: '{path}/{name_append}_{country}' and appending the format string at the end depending on which you choose.
+    
+    :param dictionary: Dictionary that contains the countries used to generate the samples as keys and the DataFrames of the samples as values.
+    :type dictionary: dict
+    :param path: String of the base path on which you want to save the content. This will be the base on which you build the saving path.
+    :type path: str
+    :param file_type: File type you want to save the data in. Only currently supported formats are csv and parquet.
+    :type file_type: str
+    :param name_append: The extension you want to paste after you base path. This will be the name of your file in the folder of the base path, without the extension!!
+    :type name_append: str
+    :param sep: Separator in case you use the csv format, defaults to ';'
+    :type sep: str or None, optional
+    :param selected_columns: The columns of the DataFrame from the sample that you want to keep. If you are in doubt keep the default options, defaults to ['request_uri', 'searched_query', 'populated_fields', 'countryName', 'who_searched', 'request_country', 'method_name', 'lib_postal_result', 'parsed_request_quertystring', 'developer_email', 'search_query_counts', 'country', 'components', 'number_components']
+    :type selected_columns: list, optional
+    """
+    for country in dictionary.keys():
+        df = dictionary[country][selected_columns]
+        file_path = f'{path}/{name_append}_{country}'
+        if file_type == 'parquet':
+            df.to_parquet(file_path + '.parquet')
+        elif file_type == 'csv':
+            df.to_csv((file_path + '.csv'), sep=sep, header=True)
+        else:
+            raise NameError(f'The file_type parameter must be "parquet" or "csv", you passed: {file_type}')
+            
+        print(f'{country.upper()} is done in {file_path}!!')

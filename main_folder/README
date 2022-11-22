@@ -1,0 +1,53 @@
+EXECUTING THE COORDINATE EXTRACTION PROCESS:
+
+Introduction:
+This process takes the data from the search logs stored in the ADX database and returns the same search logs but with their respective coordinates. The idea of this process is to build an understanding of how are the search logs distributed geographically. For that, we query the search logs from different endpoints in the ADX database, clean them and pass them through to the API to get their coordinates.
+
+Folder structure:
+The folder has a few folders and executable notebook that we should consider. But first, lets look at the general structure of the folder:
+
+main_folder
+│   README.md
+│   1.0-ADX_sample-generation.ipynb          --> RUN FIRST
+|   1.1_preprocessing_ADX_sample_date.ipynb  --> RUN SECOND
+|   2.0_make_API_calls.ipynb   		 		 --> RUN THIRD
+│
+└───auxiliary_functions
+│      api_calls_classes.py     --> Creates the instances to build the API class caller
+│      generating_ADX_sample.py --> Makes the calls to ADX, where search logs are stored
+|      parse_api_calls.py       --> Gets the components from the responses
+|      preprocess_ADX_search_logs_insights_data.py --> Parses and cleans API search logs
+|      useful_functions.py      --> Extra functions used for general purposes
+│   
+└───data  --> Where the raw data obtained from ADX should be stored
+│   
+└───parsed_data   --> Where the cleaned and parsed data from ADX is stored
+│   
+└───results   --> Where the responses from the API (with coordinates) are stored
+│   
+└───wheels   --> Library used in the Search (Analytics) Team to provide access to ADX
+
+
+PROCESS:
+The process you should follow is this:
+
+1. Check your dependencies are installed. If you are not sure, simply go to the needed_dependencies.txt file in the main_folder and pip install all of them on your environment (Anaconda is recommended for this). 
+NOTE: You can also go to step (3) and run the first cell in the notebook, then restart the Kernel (execution process of the notebook). This will also install most of the needed libraries, but you will still need to install Python, pandas and geopandas in the environment.
+
+2. Access your preferred Jupyter Notebook style IDE. It could be VS Code, Jupyter Notebooks, Jupyterlab or any other of your choice.
+
+3. Access the notebook called 1.0-ADX_sample-generation.ipynb in the main_folder, from your notebook handler. 
+
+4. Go to the "Setting up country to use" cell and set your parameters. You should pass a list of countries in ISO2 codes. For example if you want to get the results for Portugal, Uruguay and Indonesia, you should pass: ['PT', 'UY', 'ID'].
+
+5. Once all parameters are set, simply execute all the notebook. At the end of the execution, you should have as many new files in the data folder as countries you passed in the list. So in our example, you should have 3 files corresponding to the search logs in PT, UY and ID. The files will have a similar name to: complete_responses_26-10-2022_"country".
+
+6. Now access the notebook called "1.1_preprocessing_ADX_sample_data.ipynb" in the main_folder, from your notebook handler.
+
+7. Go to the "Setting up the initial parameters" section and set up the parameters you want to use. The read_path refers to the location of your file from step (5), so you can copy it and paste it here. Then, simply execute the entire notebook (FROM TOP TO BOTTOM!!). The results autosave to the /parsed_data folder. In this step we are cleaning the sample obtained from ADX.
+
+8. Now access the notebook called "2.0_make_API_calls.ipynb" in the main_folder, from your notebook handler.
+
+9. Go to the "Setting the parameters for the entire process" section and set up the parameters you want to use. This process builds from the preprocessed data from step (7), so you can copy the country results in the parsed_data folder and paste them to the "read_path" variable. Then execute the entire notebook (FROM TOP TO BOTTOM!!). 
+
+10. By the end of step (9) you will have a ".csv" file on the "/results" folder that contains the file with the coordinates for the preprocessed search logs. IMPORTANT NOTE: There is a parameter called "threshold" that you may be interested in changing around. The parameter measures how confident the API is on the coordinates you get. The higher the threshold, the more confident you can be about your geographical distribution, but your sample size will be reduced, which reduces certainty. So it's a trade-off between the two. If you have doubts, we have determined empirically that the API performs best at around 80-85%, so use that.
